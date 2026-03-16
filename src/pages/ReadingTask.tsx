@@ -62,16 +62,18 @@ const ReadingTask = () => {
 
   const handleDone = useCallback(() => {
     setPhase("done");
-    const eyeFrames = stopEyeTracking();
+    const trackingData = stopEyeTracking();
     const session = endSession();
 
     stopWebGazer();
 
     if (session) {
       const report = analyzeSession(session);
-      const eyeSync = analyzeEyeSync(eyeFrames);
+      const eyeSync = analyzeEyeSync(trackingData.eyeFrames);
+      const headStability = analyzeHeadStability(trackingData.headFrames);
       sessionStorage.setItem("lastReport", JSON.stringify(report));
       if (eyeSync) sessionStorage.setItem("lastEyeSync", JSON.stringify(eyeSync));
+      if (headStability) sessionStorage.setItem("lastHeadStability", JSON.stringify(headStability));
       navigate("/results");
     }
   }, [navigate]);
