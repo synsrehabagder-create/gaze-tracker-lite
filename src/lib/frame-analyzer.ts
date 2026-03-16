@@ -137,39 +137,34 @@ function dist(a: Vec2, b: Vec2): number {
 }
 
 /**
- * Eye Aspect Ratio (EAR) - Soukupová & Čech 2016
+ * Eye Aspect Ratio (EAR) - Classic 6-point formula (Soukupová & Čech 2016)
  * EAR = (|p2-p6| + |p3-p5|) / (2 * |p1-p4|)
- * Low EAR = eye closing/blink
+ * Uses specific landmark pairs for maximum sensitivity to lid closure.
  */
 function computeEAR(
   positions: number[][],
-  upperIndices: number[],
-  lowerIndices: number[],
-  cornerOuter: number,
-  cornerInner: number
+  p1: number, // outer corner
+  p2: number, // upper lid point 1
+  p3: number, // upper lid point 2
+  p4: number, // inner corner
+  p5: number, // lower lid point 2
+  p6: number, // lower lid point 1
 ): number {
-  const outer = getLandmark(positions, cornerOuter);
-  const inner = getLandmark(positions, cornerInner);
-  if (!outer || !inner) return 0.3; // default open
+  const outer = getLandmark(positions, p1);
+  const inner = getLandmark(positions, p4);
+  const upper1 = getLandmark(positions, p2);
+  const upper2 = getLandmark(positions, p3);
+  const lower1 = getLandmark(positions, p6);
+  const lower2 = getLandmark(positions, p5);
+  if (!outer || !inner || !upper1 || !upper2 || !lower1 || !lower2) return 0.3;
 
   const eyeWidth = dist(outer, inner);
   if (eyeWidth < 1) return 0.3;
 
-  // Average vertical distance at multiple points
-  let vertSum = 0;
-  let count = 0;
-  const pairs = Math.min(upperIndices.length, lowerIndices.length);
-  for (let i = 0; i < pairs; i++) {
-    const upper = getLandmark(positions, upperIndices[i]);
-    const lower = getLandmark(positions, lowerIndices[i]);
-    if (upper && lower) {
-      vertSum += dist(upper, lower);
-      count++;
-    }
-  }
+  const v1 = dist(upper1, lower1);
+  const v2 = dist(upper2, lower2);
 
-  if (count === 0) return 0.3;
-  return (vertSum / count) / eyeWidth;
+  return (v1 + v2) / (2.0 * eyeWidth);
 }
 
 /**
