@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getWebGazer, initWebGazer, stopWebGazer } from "@/lib/webgazer-loader";
-import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
-import { startEyeTracking, stopEyeTracking, analyzeEyeSync, analyzeHeadStability } from "@/lib/eye-tracking";
+import { startTracking, stopTracking, setTrackingBounds } from "@/lib/tracker";
 
 const READING_TEXT = `Solen skinte over de grønne åsene da Emma og hunden hennes, Buster, gikk ut på tur. De fulgte stien langs elven, der vannet rant stille mellom steinene. Buster stoppet for å snuse på en blomst. Emma lo og klappet ham på hodet.
 
@@ -30,50 +29,39 @@ const ReadingTask = () => {
     if (phase !== "reading") return;
 
     let cancelled = false;
-    startSession("reading");
+    const sessionId = crypto.randomUUID();
 
     if (taskAreaRef.current) {
       const rect = taskAreaRef.current.getBoundingClientRect();
-      setTaskAreaBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      setTrackingBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     }
 
-    const startTracking = async () => {
+    const begin = async () => {
       const ok = await initWebGazer();
       if (!ok || cancelled) return;
 
       try {
         const wg = getWebGazer();
-        wg.setGazeListener((data: any) => {
-          if (data) addGazePoint(data.x, data.y);
-        });
-        startEyeTracking(wg);
+        startTracking(wg, "reading", sessionId);
       } catch (e) {
-        console.warn("WebGazer gaze listener error", e);
+        console.warn("Tracking start error", e);
       }
     };
 
-    void startTracking();
+    void begin();
 
     return () => {
       cancelled = true;
-      try { getWebGazer().setGazeListener(() => {}); } catch {}
     };
   }, [phase]);
 
   const handleDone = useCallback(() => {
     setPhase("done");
-    const trackingData = stopEyeTracking();
-    const session = endSession();
-
+    const report = stopTracking();
     stopWebGazer();
 
-    if (session) {
-      const report = analyzeSession(session);
-      const eyeSync = analyzeEyeSync(trackingData.eyeFrames);
-      const headStability = analyzeHeadStability(trackingData.headFrames);
-      sessionStorage.setItem("lastReport", JSON.stringify(report));
-      if (eyeSync) sessionStorage.setItem("lastEyeSync", JSON.stringify(eyeSync));
-      if (headStability) sessionStorage.setItem("lastHeadStability", JSON.stringify(headStability));
+    if (report) {
+      sessionStorage.setItem("clinicalReport", JSON.stringify(report));
       navigate("/results");
     }
   }, [navigate]);
