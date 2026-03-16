@@ -240,7 +240,12 @@ function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
 }
 
 function analyzeSaccades(frames: FrameFeatures[]): SaccadeMetrics {
-  const SACCADE_THRESHOLD = 30; // px
+  // Compute median PD for scale-relative threshold
+  const pds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const medianPD = pds[Math.floor(pds.length / 2)] || 50;
+
+  // Saccade = eye movement > 15% of PD between frames (~7px at PD=50)
+  const SACCADE_THRESHOLD = medianPD * 0.15;
   const saccades: { amplitude: number; velocity: number; direction: "forward" | "backward" | "vertical" }[] = [];
 
   for (let i = 1; i < frames.length; i++) {
@@ -274,7 +279,7 @@ function analyzeSaccades(frames: FrameFeatures[]): SaccadeMetrics {
 
   return {
     totalSaccades: saccades.length,
-    avgSaccadeAmplitude: saccades.length > 0 ? Math.round(saccades.reduce((a, s) => a + s.amplitude, 0) / saccades.length) : 0,
+    avgSaccadeAmplitude: saccades.length > 0 ? Math.round(saccades.reduce((a, s) => a + s.amplitude, 0) / saccades.length * 10) / 10 : 0,
     avgSaccadeVelocity: saccades.length > 0 ? Math.round(saccades.reduce((a, s) => a + s.velocity, 0) / saccades.length) : 0,
     forwardSaccades: forward,
     regressions: backward,
