@@ -474,9 +474,11 @@ function analyzeEyeHeadCoordination(frames: FrameFeatures[]): EyeHeadCoordinatio
     const prevHeadMove = Math.abs(frames[i].headX - frames[i - 1].headX);
 
     if (headMove > 5 && eyeMove > 5) {
-      // Head moved first, then eyes followed
-      if (headMove > prevEyeMove && eyeMove > prevHeadMove) headLeadEvents++;
-      else eyeLeadEvents++;
+      // Threshold relative to landmark scale — lower for FaceMesh coords
+      if (headMove > 2 && eyeMove > 2) {
+        if (headMove > prevEyeMove && eyeMove > prevHeadMove) headLeadEvents++;
+        else eyeLeadEvents++;
+      }
     }
 
     if (headMove > 3) totalCompensation += headMove;
