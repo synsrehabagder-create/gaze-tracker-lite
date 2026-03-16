@@ -64,7 +64,7 @@ const Setup = () => {
   }, [step]);
 
   const handleContinue = () => {
-    // Stop stream — WebGazer will start its own
+    // Stop stream — face-detector will start its own
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
     }
