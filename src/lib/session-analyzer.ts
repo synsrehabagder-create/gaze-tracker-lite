@@ -353,12 +353,15 @@ function analyzeHead(frames: FrameFeatures[], durationMs: number): HeadMetrics {
   const avgSpeed = seconds > 0 ? totalMovement / seconds : 0;
 
   // Compensatory head movements: head moves in same direction as expected eye movement
+  // Use PD-relative threshold
+  const compPds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const compMedianPD = compPds[Math.floor(compPds.length / 2)] || 50;
+  const headMoveThreshold = compMedianPD * 0.04; // ~2px at PD=50
   let compensatoryMovements = 0;
   for (let i = 1; i < frames.length; i++) {
     const headDx = frames[i].headX - frames[i - 1].headX;
     const eyeDx = (frames[i].leftEye.x - frames[i - 1].leftEye.x);
-    // If head moves significantly and in same direction as gaze
-    if (Math.abs(headDx) > 3 && headDx * eyeDx > 0) {
+    if (Math.abs(headDx) > headMoveThreshold && headDx * eyeDx > 0) {
       compensatoryMovements++;
     }
   }
