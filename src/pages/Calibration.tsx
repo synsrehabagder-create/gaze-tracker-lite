@@ -1,171 +1,99 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { getWebGazer, getWebGazerInitError, initWebGazer, isWebGazerReady } from "@/lib/webgazer-loader";
+import { initDetector, isDetectorReady, getDetectorError, startDetection, stopDetection } from "@/lib/face-detector";
 
-const CALIBRATION_POINTS = [
-  { x: 0.1, y: 0.1 },
-  { x: 0.5, y: 0.1 },
-  { x: 0.9, y: 0.1 },
-  { x: 0.1, y: 0.5 },
-  { x: 0.5, y: 0.5 },
-  { x: 0.9, y: 0.5 },
-  { x: 0.1, y: 0.9 },
-  { x: 0.5, y: 0.9 },
-  { x: 0.9, y: 0.9 },
-];
-
-function toUserError(rawError: string | null) {
-  if (!rawError) return "Kunne ikke starte blikksporing på denne enheten/nettleseren.";
-
+function toUserError(rawError: string | null): string {
+  if (!rawError) return "Kunne ikke starte ansiktsgjenkjenning på denne enheten/nettleseren.";
   const e = rawError.toLowerCase();
-  if (e.includes("notallowed") || e.includes("permission") || e.includes("denied")) {
+  if (e.includes("notallowed") || e.includes("permission") || e.includes("denied"))
     return "Kameratilgang ble avvist. Tillat kamera i nettleseren og prøv igjen.";
-  }
-
-  if (e.includes("notfound") || e.includes("no camera") || e.includes("could not start video source")) {
+  if (e.includes("notfound") || e.includes("no camera") || e.includes("could not start video source"))
     return "Fant ikke tilgjengelig kamera på denne enheten.";
-  }
-
-  if (e.includes("network") || e.includes("404") || e.includes("failed to fetch") || e.includes("abort")) {
-    return "Kunne ikke laste sporingsmotoren. Prøv å laste siden på nytt.";
-  }
-
-  return "Kunne ikke starte blikksporing på denne enheten/nettleseren.";
+  if (e.includes("network") || e.includes("404") || e.includes("failed to fetch") || e.includes("abort"))
+    return "Kunne ikke laste ansiktsmodellen. Prøv å laste siden på nytt.";
+  return "Kunne ikke starte ansiktsgjenkjenning på denne enheten/nettleseren.";
 }
 
 const Calibration = () => {
   const navigate = useNavigate();
-  const [currentPoint, setCurrentPoint] = useState(0);
-  const [clickCount, setClickCount] = useState(0);
-  const [status, setStatus] = useState<"idle" | "loading" | "calibrating" | "done" | "error">("idle");
-  const [hitPoints, setHitPoints] = useState<Set<number>>(new Set());
+  const [status, setStatus] = useState<"idle" | "loading" | "verifying" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const CLICKS_PER_POINT = 3;
+  const [frameCount, setFrameCount] = useState(0);
+  const frameCountRef = useRef(0);
 
-  const startTracking = useCallback(async () => {
+  const handleStart = useCallback(async () => {
     setStatus("loading");
     setError(null);
-
-    const ok = isWebGazerReady() ? true : await initWebGazer();
-
+    const ok = isDetectorReady() ? true : await initDetector();
     if (!ok) {
       setStatus("error");
-      setError(toUserError(getWebGazerInitError()));
+      setError(toUserError(getDetectorError()));
       return;
     }
-
-    setStatus("calibrating");
+    setStatus("verifying");
+    frameCountRef.current = 0;
+    setFrameCount(0);
+    startDetection(() => {
+      frameCountRef.current += 1;
+      setFrameCount(frameCountRef.current);
+    });
   }, []);
 
-  const handlePointClick = useCallback(
-    (index: number) => {
-      if (index !== currentPoint) return;
-
-      const newCount = clickCount + 1;
-      setClickCount(newCount);
-
-      const point = CALIBRATION_POINTS[index];
-      const x = point.x * window.innerWidth;
-      const y = point.y * window.innerHeight;
-
-      try {
-        getWebGazer().recordScreenPosition(x, y, "click");
-      } catch (e) {
-        console.warn("recordScreenPosition failed", e);
-      }
-
-      if (newCount >= CLICKS_PER_POINT) {
-        const newHit = new Set(hitPoints);
-        newHit.add(index);
-        setHitPoints(newHit);
-
-        if (index < CALIBRATION_POINTS.length - 1) {
-          setCurrentPoint(index + 1);
-          setClickCount(0);
-        } else {
-          setStatus("done");
-          setTimeout(() => navigate("/task-select"), 800);
-        }
-      }
-    },
-    [currentPoint, clickCount, hitPoints, navigate]
-  );
+  useEffect(() => {
+    if (status !== "verifying" || frameCount < 15) return;
+    setStatus("done");
+    stopDetection();
+    const timer = setTimeout(() => navigate("/task-select"), 800);
+    return () => clearTimeout(timer);
+  }, [status, frameCount, navigate]);
 
   return (
     <div className="fixed inset-0 bg-background">
-      {(status === "idle" || status === "loading" || status === "error") && (
-        <div className="h-full flex items-center justify-center px-6">
-          <div className="card-surface p-6 w-full max-w-md text-center space-y-4">
-            <h1 className="text-lg font-semibold text-foreground">Kalibrering</h1>
-            <p className="text-sm text-muted-foreground">
-              Trykk for å starte blikksporing, og klikk deretter på punktene.
-            </p>
+      <div className="h-full flex items-center justify-center px-6">
+        <div className="card-surface p-6 w-full max-w-md text-center space-y-4">
+          <h1 className="text-lg font-semibold text-foreground">Ansiktsgjenkjenning</h1>
 
-            {status === "loading" && (
-              <div className="space-y-2">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-sm text-muted-foreground">Laster blikksporing…</p>
-              </div>
-            )}
+          {status === "idle" && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Se rett på kameraet mens vi verifiserer ansiktsgjenkjenning.
+              </p>
+              <Button onClick={handleStart} className="w-full">Start</Button>
+            </>
+          )}
 
-            {status === "error" && error && <p className="text-sm text-destructive">{error}</p>}
+          {status === "loading" && (
+            <div className="space-y-2">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-sm text-muted-foreground">Laster ansiktsmodell...</p>
+            </div>
+          )}
 
-            {status !== "loading" && (
-              <Button onClick={startTracking} className="w-full">
-                Start blikksporing
-              </Button>
-            )}
+          {status === "verifying" && (
+            <div className="space-y-2">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-sm text-muted-foreground">Verifiserer ansiktsgjenkjenning...</p>
+              <p className="text-xs text-muted-foreground">Se rett på kameraet</p>
+              <p className="text-xs text-muted-foreground tabular-nums">{frameCount} / 15 frames</p>
+            </div>
+          )}
 
-            {status === "error" && (
+          {status === "done" && (
+            <p className="text-sm text-success font-medium">Ansiktsgjenkjenning verifisert ✓</p>
+          )}
+
+          {status === "error" && (
+            <>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button onClick={handleStart} className="w-full">Prøv igjen</Button>
               <Button variant="outline" onClick={() => navigate("/task-select")} className="w-full">
-                Fortsett uten blikksporing
+                Fortsett uten ansiktsgjenkjenning
               </Button>
-            )}
-          </div>
+            </>
+          )}
         </div>
-      )}
-
-      {status === "calibrating" && (
-        <>
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
-            <p className="text-sm text-muted-foreground tabular-nums">
-              Punkt {currentPoint + 1} av {CALIBRATION_POINTS.length} — klikk {CLICKS_PER_POINT - clickCount} ganger
-            </p>
-          </div>
-
-          {CALIBRATION_POINTS.map((point, index) => {
-            const isActive = index === currentPoint;
-            const isHit = hitPoints.has(index);
-            const isFuture = index > currentPoint;
-
-            return (
-              <button
-                key={index}
-                onClick={() => handlePointClick(index)}
-                className="absolute transition-clinical"
-                style={{
-                  left: `${point.x * 100}%`,
-                  top: `${point.y * 100}%`,
-                  transform: `translate(-50%, -50%) scale(${isHit ? 0.8 : 1})`,
-                }}
-              >
-                <div
-                  className={`w-6 h-6 rounded-full transition-clinical ${
-                    isHit ? "bg-success" : isActive ? "bg-primary animate-pulse-soft" : isFuture ? "bg-muted" : "bg-muted"
-                  }`}
-                />
-              </button>
-            );
-          })}
-        </>
-      )}
-
-      {status === "done" && (
-        <div className="h-full flex items-center justify-center">
-          <p className="text-sm text-success font-medium">Kalibrering fullført ✓</p>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
