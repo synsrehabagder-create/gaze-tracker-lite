@@ -28,6 +28,8 @@ export interface SessionReport {
 }
 
 let currentSession: SessionData | null = null;
+let lastFilteredPoint: GazePoint | null = null;
+let lastStoredTimestamp = 0;
 
 export function startSession(type: "reading" | "pursuit"): SessionData {
   currentSession = {
@@ -36,12 +38,40 @@ export function startSession(type: "reading" | "pursuit"): SessionData {
     startTime: Date.now(),
     gazePoints: [],
   };
+  lastFilteredPoint = null;
+  lastStoredTimestamp = 0;
   return currentSession;
 }
 
 export function addGazePoint(x: number, y: number) {
-  if (!currentSession) return;
-  currentSession.gazePoints.push({ x, y, timestamp: Date.now() });
+  if (!currentSession || !Number.isFinite(x) || !Number.isFinite(y)) return;
+
+  const timestamp = Date.now();
+  const clampedX = Math.max(0, Math.min(window.innerWidth, x));
+  const clampedY = Math.max(0, Math.min(window.innerHeight, y));
+
+  if (lastFilteredPoint) {
+    const dt = timestamp - lastFilteredPoint.timestamp;
+    const jump = Math.hypot(clampedX - lastFilteredPoint.x, clampedY - lastFilteredPoint.y);
+
+    // Drop impossible jumps (typisk tracking-glitch)
+    if ((dt < 60 && jump > 300) || jump > Math.max(window.innerWidth, window.innerHeight) * 0.7) {
+      return;
+    }
+  }
+
+  if (lastStoredTimestamp && timestamp - lastStoredTimestamp < 25) {
+    return;
+  }
+
+  const alpha = 0.35;
+  const filteredX = lastFilteredPoint ? lastFilteredPoint.x + (clampedX - lastFilteredPoint.x) * alpha : clampedX;
+  const filteredY = lastFilteredPoint ? lastFilteredPoint.y + (clampedY - lastFilteredPoint.y) * alpha : clampedY;
+
+  const point = { x: filteredX, y: filteredY, timestamp };
+  currentSession.gazePoints.push(point);
+  lastFilteredPoint = point;
+  lastStoredTimestamp = timestamp;
 }
 
 export function setTaskAreaBounds(bounds: { x: number; y: number; width: number; height: number }) {
