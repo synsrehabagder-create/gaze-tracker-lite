@@ -380,28 +380,37 @@ function analyzeHead(frames: FrameFeatures[], durationMs: number): HeadMetrics {
 
 function analyzeAttention(
   frames: FrameFeatures[],
-  taskBounds: { x: number; y: number; width: number; height: number } | null
+  _taskBounds: { x: number; y: number; width: number; height: number } | null
 ): AttentionMetrics {
-  if (!taskBounds || frames.length < 2) {
+  if (frames.length < 10) {
     return { onTaskPercentage: 0, attentionDrops: 0, avgOffTaskDuration: 0, longestOffTask: 0, fatigueIndex: 0 };
   }
 
-  const margin = 50;
+  // Since FaceMesh landmarks are in video-frame coordinates (not screen coords),
+  // we can't compare to DOM taskBounds. Instead, use a statistical approach:
+  // compute the "home" position from the median, and flag frames that deviate significantly.
+  const pds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const medianPD = pds[Math.floor(pds.length / 2)] || 50;
+
+  // Compute median head position as "on-task" reference
+  const headXs = frames.map(f => f.headX).sort((a, b) => a - b);
+  const headYs = frames.map(f => f.headY).sort((a, b) => a - b);
+  const medianHeadX = headXs[Math.floor(headXs.length / 2)];
+  const medianHeadY = headYs[Math.floor(headYs.length / 2)];
+
+  // "Off-task" = head deviates more than 1.5x PD from median position
+  const offTaskThreshold = medianPD * 1.5;
+
   let onTask = 0;
   let offTaskStart: number | null = null;
   let drops = 0;
   const offTaskDurations: number[] = [];
 
   for (const f of frames) {
-    // Use WebGazer-predicted gaze, not raw eye position
-    // But since we only have eye landmarks, use them as proxy
-    const inBounds =
-      f.headX >= taskBounds.x - margin &&
-      f.headX <= taskBounds.x + taskBounds.width + margin &&
-      f.headY >= taskBounds.y - margin &&
-      f.headY <= taskBounds.y + taskBounds.height + margin;
+    const deviation = Math.hypot(f.headX - medianHeadX, f.headY - medianHeadY);
+    const isOnTask = deviation < offTaskThreshold;
 
-    if (inBounds) {
+    if (isOnTask) {
       onTask++;
       if (offTaskStart !== null) {
         offTaskDurations.push(f.timestamp - offTaskStart);
@@ -425,7 +434,9 @@ function analyzeAttention(
 
   const firstJitter = computeAvgJitter(firstHalf);
   const secondJitter = computeAvgJitter(secondHalf);
-  const fatigueIndex = secondJitter > firstJitter * 1.3 ? Math.min(100, Math.round((secondJitter / firstJitter - 1) * 100)) : 0;
+  const fatigueIndex = firstJitter > 0 && secondJitter > firstJitter * 1.3
+    ? Math.min(100, Math.round((secondJitter / firstJitter - 1) * 100))
+    : 0;
 
   return {
     onTaskPercentage: Math.round((onTask / frames.length) * 100),
