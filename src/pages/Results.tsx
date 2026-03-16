@@ -109,6 +109,13 @@ const Results = () => {
           </div>
         </div>
 
+        {/* Eye sync section */}
+        {eyeSync && (
+          <div className="card-surface p-5">
+            <EyeSyncCard report={eyeSync} />
+          </div>
+        )}
+
         {/* Gaze trajectory visualization */}
         <div className="card-surface p-5 space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Blikkbane (X over tid)</h2>
