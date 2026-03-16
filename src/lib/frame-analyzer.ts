@@ -106,7 +106,7 @@ export interface FrameFeatures {
 
 // ==================== Extraction ====================
 
-const BLINK_EAR_THRESHOLD = 0.18;
+const BLINK_EAR_THRESHOLD = 0.22;
 
 function getLandmark(positions: number[][], index: number): Vec2 | null {
   const p = positions[index];
