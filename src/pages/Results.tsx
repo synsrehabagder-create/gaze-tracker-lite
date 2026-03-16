@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SessionReport, exportToJSON, exportToCSV } from "@/lib/gaze-store";
+import { EyeSyncReport } from "@/lib/eye-tracking";
+import EyeSyncCard from "@/components/EyeSyncCard";
 import { ArrowLeft, Download, Eye, Activity, BarChart3, AlertTriangle } from "lucide-react";
 
 const Results = () => {
