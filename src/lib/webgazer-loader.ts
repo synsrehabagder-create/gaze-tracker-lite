@@ -24,8 +24,10 @@ export async function initWebGazer() {
 
   initPromise = (async () => {
     try {
+      webgazer.params.faceMeshSolutionPath = "/mediapipe/face_mesh";
+
       webgazer
-        .setTracker("clmtrackr")
+        .setTracker("TFFacemesh")
         .setRegression("ridge")
         .saveDataAcrossSessions(false)
         .showPredictionPoints(false)
