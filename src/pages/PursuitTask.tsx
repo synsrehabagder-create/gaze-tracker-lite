@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getWebGazer, initWebGazer, stopWebGazer } from "@/lib/webgazer-loader";
 import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
+import { startEyeTracking, stopEyeTracking, analyzeEyeSync } from "@/lib/eye-tracking";
 
 const DURATION = 15000;
 
