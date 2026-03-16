@@ -62,8 +62,8 @@ const ReadingTask = () => {
 
     if (report) {
       sessionStorage.setItem("clinicalReport", JSON.stringify(report));
-      navigate("/results");
     }
+    navigate("/results");
   }, [navigate]);
 
   return (
