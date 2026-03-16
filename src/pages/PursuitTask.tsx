@@ -46,14 +46,21 @@ const PursuitTask = () => {
       setTaskAreaBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     }
 
-    try {
-      const wg = getWebGazer();
-      wg.setGazeListener((data: any) => {
-        if (data) addGazePoint(data.x, data.y);
-      });
-    } catch (e) {
-      console.warn("WebGazer gaze listener error", e);
-    }
+    const startTracking = async () => {
+      const ok = await initWebGazer();
+      if (!ok) return;
+
+      try {
+        const wg = getWebGazer();
+        wg.setGazeListener((data: any) => {
+          if (data) addGazePoint(data.x, data.y);
+        });
+      } catch (e) {
+        console.warn("WebGazer gaze listener error", e);
+      }
+    };
+
+    void startTracking();
 
     const startTime = Date.now();
     const interval = setInterval(() => {

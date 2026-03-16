@@ -62,11 +62,7 @@ const ReadingTask = () => {
     setPhase("done");
     const session = endSession();
 
-    try {
-      const wg = getWebGazer();
-      wg.setGazeListener(() => {});
-      wg.end();
-    } catch {}
+    stopWebGazer();
 
     if (session) {
       const report = analyzeSession(session);
