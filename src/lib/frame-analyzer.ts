@@ -21,6 +21,11 @@ const RIGHT_EYE_LOWER = [374, 380, 381, 382, 362, 373, 390];
 const RIGHT_EYE_CORNER_OUTER = 263;
 const RIGHT_EYE_CORNER_INNER = 362;
 
+const RIGHT_EAR_P2 = 386;
+const RIGHT_EAR_P3 = 385;
+const RIGHT_EAR_P5 = 380;
+const RIGHT_EAR_P6 = 374;
+
 // Iris landmarks (available when FaceMesh iris model is loaded)
 const LEFT_IRIS = [468, 469, 470, 471, 472]; // 468 = center
 const RIGHT_IRIS = [473, 474, 475, 476, 477]; // 473 = center
