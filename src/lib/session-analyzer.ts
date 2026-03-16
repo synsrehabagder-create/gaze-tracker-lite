@@ -178,7 +178,12 @@ function analyzeBlinkMetrics(frames: FrameFeatures[], durationMs: number): Blink
 }
 
 function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
-  const FIXATION_THRESHOLD = 15; // px movement = still a fixation
+  // Compute median PD for scale-relative thresholds
+  const pds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const medianPD = pds[Math.floor(pds.length / 2)] || 50;
+
+  // Thresholds as fraction of PD (eye movements in landmark space are small)
+  const FIXATION_THRESHOLD = medianPD * 0.08; // ~4px at PD=50
   const MIN_FIXATION_MS = 50;
 
   const fixations: { start: number; end: number; jitter: number }[] = [];
@@ -198,7 +203,6 @@ function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
       jitterSum += movement;
       jitterCount++;
     } else {
-      // End fixation
       const dur = frames[i].timestamp - frames[fixStart].timestamp;
       if (dur >= MIN_FIXATION_MS) {
         fixations.push({
@@ -221,7 +225,9 @@ function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
   const avg = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
 
   const avgJitter = fixations.length > 0 ? fixations.reduce((a, f) => a + f.jitter, 0) / fixations.length : 0;
-  const fixationStability = Math.max(0, Math.min(100, Math.round(100 - avgJitter * 5)));
+  // Normalize jitter penalty by PD scale
+  const normalizedJitter = medianPD > 0 ? (avgJitter / medianPD) * 100 : avgJitter;
+  const fixationStability = Math.max(0, Math.min(100, Math.round(100 - normalizedJitter * 20)));
 
   return {
     totalFixations: fixations.length,
@@ -234,7 +240,12 @@ function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
 }
 
 function analyzeSaccades(frames: FrameFeatures[]): SaccadeMetrics {
-  const SACCADE_THRESHOLD = 30; // px
+  // Compute median PD for scale-relative threshold
+  const pds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const medianPD = pds[Math.floor(pds.length / 2)] || 50;
+
+  // Saccade = eye movement > 15% of PD between frames (~7px at PD=50)
+  const SACCADE_THRESHOLD = medianPD * 0.15;
   const saccades: { amplitude: number; velocity: number; direction: "forward" | "backward" | "vertical" }[] = [];
 
   for (let i = 1; i < frames.length; i++) {
@@ -268,7 +279,7 @@ function analyzeSaccades(frames: FrameFeatures[]): SaccadeMetrics {
 
   return {
     totalSaccades: saccades.length,
-    avgSaccadeAmplitude: saccades.length > 0 ? Math.round(saccades.reduce((a, s) => a + s.amplitude, 0) / saccades.length) : 0,
+    avgSaccadeAmplitude: saccades.length > 0 ? Math.round(saccades.reduce((a, s) => a + s.amplitude, 0) / saccades.length * 10) / 10 : 0,
     avgSaccadeVelocity: saccades.length > 0 ? Math.round(saccades.reduce((a, s) => a + s.velocity, 0) / saccades.length) : 0,
     forwardSaccades: forward,
     regressions: backward,
@@ -342,12 +353,15 @@ function analyzeHead(frames: FrameFeatures[], durationMs: number): HeadMetrics {
   const avgSpeed = seconds > 0 ? totalMovement / seconds : 0;
 
   // Compensatory head movements: head moves in same direction as expected eye movement
+  // Use PD-relative threshold
+  const compPds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const compMedianPD = compPds[Math.floor(compPds.length / 2)] || 50;
+  const headMoveThreshold = compMedianPD * 0.04; // ~2px at PD=50
   let compensatoryMovements = 0;
   for (let i = 1; i < frames.length; i++) {
     const headDx = frames[i].headX - frames[i - 1].headX;
     const eyeDx = (frames[i].leftEye.x - frames[i - 1].leftEye.x);
-    // If head moves significantly and in same direction as gaze
-    if (Math.abs(headDx) > 3 && headDx * eyeDx > 0) {
+    if (Math.abs(headDx) > headMoveThreshold && headDx * eyeDx > 0) {
       compensatoryMovements++;
     }
   }
@@ -369,28 +383,37 @@ function analyzeHead(frames: FrameFeatures[], durationMs: number): HeadMetrics {
 
 function analyzeAttention(
   frames: FrameFeatures[],
-  taskBounds: { x: number; y: number; width: number; height: number } | null
+  _taskBounds: { x: number; y: number; width: number; height: number } | null
 ): AttentionMetrics {
-  if (!taskBounds || frames.length < 2) {
+  if (frames.length < 10) {
     return { onTaskPercentage: 0, attentionDrops: 0, avgOffTaskDuration: 0, longestOffTask: 0, fatigueIndex: 0 };
   }
 
-  const margin = 50;
+  // Since FaceMesh landmarks are in video-frame coordinates (not screen coords),
+  // we can't compare to DOM taskBounds. Instead, use a statistical approach:
+  // compute the "home" position from the median, and flag frames that deviate significantly.
+  const pds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const medianPD = pds[Math.floor(pds.length / 2)] || 50;
+
+  // Compute median head position as "on-task" reference
+  const headXs = frames.map(f => f.headX).sort((a, b) => a - b);
+  const headYs = frames.map(f => f.headY).sort((a, b) => a - b);
+  const medianHeadX = headXs[Math.floor(headXs.length / 2)];
+  const medianHeadY = headYs[Math.floor(headYs.length / 2)];
+
+  // "Off-task" = head deviates more than 1.5x PD from median position
+  const offTaskThreshold = medianPD * 1.5;
+
   let onTask = 0;
   let offTaskStart: number | null = null;
   let drops = 0;
   const offTaskDurations: number[] = [];
 
   for (const f of frames) {
-    // Use WebGazer-predicted gaze, not raw eye position
-    // But since we only have eye landmarks, use them as proxy
-    const inBounds =
-      f.headX >= taskBounds.x - margin &&
-      f.headX <= taskBounds.x + taskBounds.width + margin &&
-      f.headY >= taskBounds.y - margin &&
-      f.headY <= taskBounds.y + taskBounds.height + margin;
+    const deviation = Math.hypot(f.headX - medianHeadX, f.headY - medianHeadY);
+    const isOnTask = deviation < offTaskThreshold;
 
-    if (inBounds) {
+    if (isOnTask) {
       onTask++;
       if (offTaskStart !== null) {
         offTaskDurations.push(f.timestamp - offTaskStart);
@@ -414,7 +437,9 @@ function analyzeAttention(
 
   const firstJitter = computeAvgJitter(firstHalf);
   const secondJitter = computeAvgJitter(secondHalf);
-  const fatigueIndex = secondJitter > firstJitter * 1.3 ? Math.min(100, Math.round((secondJitter / firstJitter - 1) * 100)) : 0;
+  const fatigueIndex = firstJitter > 0 && secondJitter > firstJitter * 1.3
+    ? Math.min(100, Math.round((secondJitter / firstJitter - 1) * 100))
+    : 0;
 
   return {
     onTaskPercentage: Math.round((onTask / frames.length) * 100),
@@ -449,9 +474,11 @@ function analyzeEyeHeadCoordination(frames: FrameFeatures[]): EyeHeadCoordinatio
     const prevHeadMove = Math.abs(frames[i].headX - frames[i - 1].headX);
 
     if (headMove > 5 && eyeMove > 5) {
-      // Head moved first, then eyes followed
-      if (headMove > prevEyeMove && eyeMove > prevHeadMove) headLeadEvents++;
-      else eyeLeadEvents++;
+      // Threshold relative to landmark scale — lower for FaceMesh coords
+      if (headMove > 2 && eyeMove > 2) {
+        if (headMove > prevEyeMove && eyeMove > prevHeadMove) headLeadEvents++;
+        else eyeLeadEvents++;
+      }
     }
 
     if (headMove > 3) totalCompensation += headMove;
