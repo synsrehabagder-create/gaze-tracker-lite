@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { getWebGazer } from "@/lib/webgazer-loader";
+import { Button } from "@/components/ui/button";
+import { initWebGazer, isWebGazerReady, getWebGazer } from "@/lib/webgazer-loader";
 
 const CALIBRATION_POINTS = [
   { x: 0.1, y: 0.1 },
@@ -18,40 +19,24 @@ const Calibration = () => {
   const navigate = useNavigate();
   const [currentPoint, setCurrentPoint] = useState(0);
   const [clickCount, setClickCount] = useState(0);
-  const [status, setStatus] = useState<"loading" | "calibrating" | "done">("loading");
+  const [status, setStatus] = useState<"idle" | "loading" | "calibrating" | "done" | "error">("idle");
   const [hitPoints, setHitPoints] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const CLICKS_PER_POINT = 3;
 
-  useEffect(() => {
-    let mounted = true;
+  const startTracking = useCallback(async () => {
+    setStatus("loading");
+    setError(null);
 
-    const init = async () => {
-      try {
-        const wg = getWebGazer();
-        
-        wg.setRegression("ridge")
-          .setGazeListener((_data: any, _clock: any) => {})
-          .showPredictionPoints(false);
+    const ok = isWebGazerReady() ? true : await initWebGazer();
 
-        await wg.begin();
+    if (!ok) {
+      setStatus("error");
+      setError("Kunne ikke starte blikksporing på denne enheten/nettleseren.");
+      return;
+    }
 
-        // Hide WebGazer's default video elements
-        const ids = ["webgazerVideoFeed", "webgazerVideoContainer", "webgazerFaceOverlay", "webgazerFaceFeedbackBox"];
-        ids.forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.style.display = "none";
-        });
-
-        if (mounted) setStatus("calibrating");
-      } catch (err) {
-        console.error("WebGazer init failed:", err);
-        if (mounted) setError("Kunne ikke starte blikksporing. Sjekk at kameraet er tilgjengelig.");
-      }
-    };
-
-    init();
-    return () => { mounted = false; };
+    setStatus("calibrating");
   }, []);
 
   const handlePointClick = useCallback(
@@ -64,7 +49,7 @@ const Calibration = () => {
       const point = CALIBRATION_POINTS[index];
       const x = point.x * window.innerWidth;
       const y = point.y * window.innerHeight;
-      
+
       try {
         getWebGazer().recordScreenPosition(x, y, "click");
       } catch (e) {
@@ -90,12 +75,34 @@ const Calibration = () => {
 
   return (
     <div className="fixed inset-0 bg-background">
-      {status === "loading" && (
-        <div className="h-full flex items-center justify-center">
-          <div className="text-center space-y-3">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-sm text-muted-foreground">Laster blikksporing…</p>
-            {error && <p className="text-sm text-destructive max-w-xs">{error}</p>}
+      {(status === "idle" || status === "loading" || status === "error") && (
+        <div className="h-full flex items-center justify-center px-6">
+          <div className="card-surface p-6 w-full max-w-md text-center space-y-4">
+            <h1 className="text-lg font-semibold text-foreground">Kalibrering</h1>
+            <p className="text-sm text-muted-foreground">
+              Trykk for å starte blikksporing, og klikk deretter på punktene.
+            </p>
+
+            {status === "loading" && (
+              <div className="space-y-2">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-sm text-muted-foreground">Laster blikksporing…</p>
+              </div>
+            )}
+
+            {status === "error" && error && <p className="text-sm text-destructive">{error}</p>}
+
+            {status !== "loading" && (
+              <Button onClick={startTracking} className="w-full">
+                Start blikksporing
+              </Button>
+            )}
+
+            {status === "error" && (
+              <Button variant="outline" onClick={() => navigate("/task-select")} className="w-full">
+                Fortsett uten blikksporing
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -126,13 +133,7 @@ const Calibration = () => {
               >
                 <div
                   className={`w-6 h-6 rounded-full transition-clinical ${
-                    isHit
-                      ? "bg-success"
-                      : isActive
-                      ? "bg-primary animate-pulse-soft"
-                      : isFuture
-                      ? "bg-muted"
-                      : "bg-muted"
+                    isHit ? "bg-success" : isActive ? "bg-primary animate-pulse-soft" : isFuture ? "bg-muted" : "bg-muted"
                   }`}
                 />
               </button>
