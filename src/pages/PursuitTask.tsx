@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { getWebGazer } from "@/lib/webgazer-loader";
 import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
 
-const DURATION = 15000; // 15 seconds
+const DURATION = 15000;
 
 const PursuitTask = () => {
   const navigate = useNavigate();
@@ -12,7 +13,6 @@ const PursuitTask = () => {
   const [dotPos, setDotPos] = useState({ x: 50, y: 50 });
   const [elapsed, setElapsed] = useState(0);
 
-  // Countdown
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdown <= 0) {
@@ -23,7 +23,23 @@ const PursuitTask = () => {
     return () => clearTimeout(timer);
   }, [countdown, phase]);
 
-  // Dot movement — smooth horizontal and slight vertical wave
+  const handleDone = useCallback(() => {
+    setPhase("done");
+    const session = endSession();
+
+    try {
+      const wg = getWebGazer();
+      wg.setGazeListener(() => {});
+      wg.end();
+    } catch {}
+
+    if (session) {
+      const report = analyzeSession(session);
+      sessionStorage.setItem("lastReport", JSON.stringify(report));
+      navigate("/results");
+    }
+  }, [navigate]);
+
   useEffect(() => {
     if (phase !== "tracking") return;
 
@@ -34,11 +50,13 @@ const PursuitTask = () => {
       setTaskAreaBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     }
 
-    const webgazer = (window as any).webgazer;
-    if (webgazer) {
-      webgazer.setGazeListener((data: any) => {
+    try {
+      const wg = getWebGazer();
+      wg.setGazeListener((data: any) => {
         if (data) addGazePoint(data.x, data.y);
       });
+    } catch (e) {
+      console.warn("WebGazer gaze listener error", e);
     }
 
     const startTime = Date.now();
@@ -53,11 +71,9 @@ const PursuitTask = () => {
       }
 
       const progress = t / DURATION;
-      // Horizontal sweep back and forth
       const cycles = 2;
-      const phase2 = (progress * cycles * 2) % 2;
-      const x = phase2 <= 1 ? phase2 : 2 - phase2;
-      // Gentle vertical wave
+      const p = (progress * cycles * 2) % 2;
+      const x = p <= 1 ? p : 2 - p;
       const y = 0.5 + Math.sin(progress * Math.PI * 4) * 0.15;
 
       setDotPos({ x: 10 + x * 80, y: 10 + y * 80 });
@@ -65,31 +81,13 @@ const PursuitTask = () => {
 
     return () => {
       clearInterval(interval);
-      if (webgazer) webgazer.setGazeListener(() => {});
+      try { getWebGazer().setGazeListener(() => {}); } catch {}
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const handleDone = useCallback(() => {
-    setPhase("done");
-    const session = endSession();
-
-    const webgazer = (window as any).webgazer;
-    if (webgazer) {
-      webgazer.setGazeListener(() => {});
-      webgazer.end();
-    }
-
-    if (session) {
-      const report = analyzeSession(session);
-      sessionStorage.setItem("lastReport", JSON.stringify(report));
-      navigate("/results");
-    }
-  }, [navigate]);
-
   return (
     <div ref={containerRef} className="fixed inset-0 bg-background flex flex-col">
-      {/* Header */}
       <div className="px-6 py-4 flex items-center justify-between z-10">
         <span className="text-xs text-muted-foreground">Følgeoppgave</span>
         {phase === "tracking" && (
@@ -99,7 +97,6 @@ const PursuitTask = () => {
         )}
       </div>
 
-      {/* Content */}
       <div className="flex-1 relative">
         {phase === "countdown" && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -112,13 +109,11 @@ const PursuitTask = () => {
 
         {phase === "tracking" && (
           <div
-            className="absolute w-6 h-6 rounded-full bg-primary transition-all"
+            className="absolute w-6 h-6 rounded-full bg-primary"
             style={{
               left: `${dotPos.x}%`,
               top: `${dotPos.y}%`,
               transform: "translate(-50%, -50%)",
-              transitionDuration: "16ms",
-              transitionTimingFunction: "linear",
             }}
           />
         )}
