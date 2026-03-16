@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { getWebGazer, initWebGazer, stopWebGazer } from "@/lib/webgazer-loader";
+import { initDetector, stopDetector } from "@/lib/face-detector";
 import { startTracking, stopTracking, setTrackingBounds } from "@/lib/tracker";
 
 const DURATION = 15000;
@@ -26,7 +26,7 @@ const PursuitTask = () => {
   const handleDone = useCallback(() => {
     setPhase("done");
     const report = stopTracking();
-    stopWebGazer();
+    stopDetector();
 
     if (report) {
       sessionStorage.setItem("clinicalReport", JSON.stringify(report));
@@ -45,12 +45,11 @@ const PursuitTask = () => {
     }
 
     const begin = async () => {
-      const ok = await initWebGazer();
+      const ok = await initDetector();
       if (!ok) return;
 
       try {
-        const wg = getWebGazer();
-        startTracking(wg, "pursuit", sessionId);
+        startTracking("pursuit", sessionId);
       } catch (e) {
         console.warn("Tracking start error", e);
       }
