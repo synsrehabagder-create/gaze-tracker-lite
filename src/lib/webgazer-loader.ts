@@ -48,6 +48,18 @@ export async function initWebGazer() {
   return initPromise;
 }
 
+export function stopWebGazer() {
+  try {
+    webgazer.setGazeListener(() => {});
+    webgazer.end();
+  } catch {
+    // no-op
+  } finally {
+    initialized = false;
+    initPromise = null;
+  }
+}
+
 export function isWebGazerReady() {
   return initialized;
 }
