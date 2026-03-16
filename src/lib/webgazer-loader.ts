@@ -110,16 +110,31 @@ async function tryBegin(faceMeshSolutionPath: string, constraints: MediaStreamCo
     endWebGazerSession();
     await wait(120);
 
+    console.log("[webgazer] Trying:", { faceMeshSolutionPath, constraints });
     configureWebGazer(faceMeshSolutionPath, constraints);
     await webgazer.begin();
     hideWebGazerUI();
 
     initialized = true;
     lastInitError = null;
+
+    // Diagnostic: verify tracker is accessible
+    try {
+      const tracker = webgazer.getTracker();
+      console.log("[webgazer] Initialized OK.", {
+        hasTracker: !!tracker,
+        trackerType: tracker?.constructor?.name,
+        hasGetPositions: typeof tracker?.getPositions === "function",
+      });
+    } catch {
+      console.warn("[webgazer] Tracker not accessible after begin()");
+    }
+
     return true;
   } catch (error) {
     initialized = false;
     lastInitError = getErrorMessage(error);
+    console.warn("[webgazer] tryBegin failed:", lastInitError);
     endWebGazerSession();
     return false;
   }
