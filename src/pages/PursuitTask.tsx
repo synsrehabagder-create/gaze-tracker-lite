@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getWebGazer, initWebGazer, stopWebGazer } from "@/lib/webgazer-loader";
-import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
-import { startEyeTracking, stopEyeTracking, analyzeEyeSync, analyzeHeadStability } from "@/lib/eye-tracking";
+import { startTracking, stopTracking, setTrackingBounds } from "@/lib/tracker";
 
 const DURATION = 15000;
 
@@ -26,18 +25,11 @@ const PursuitTask = () => {
 
   const handleDone = useCallback(() => {
     setPhase("done");
-    const trackingData = stopEyeTracking();
-    const session = endSession();
-
+    const report = stopTracking();
     stopWebGazer();
 
-    if (session) {
-      const report = analyzeSession(session);
-      const eyeSync = analyzeEyeSync(trackingData.eyeFrames);
-      const headStability = analyzeHeadStability(trackingData.headFrames);
-      sessionStorage.setItem("lastReport", JSON.stringify(report));
-      if (eyeSync) sessionStorage.setItem("lastEyeSync", JSON.stringify(eyeSync));
-      if (headStability) sessionStorage.setItem("lastHeadStability", JSON.stringify(headStability));
+    if (report) {
+      sessionStorage.setItem("clinicalReport", JSON.stringify(report));
       navigate("/results");
     }
   }, [navigate]);
@@ -45,29 +37,26 @@ const PursuitTask = () => {
   useEffect(() => {
     if (phase !== "tracking") return;
 
-    startSession("pursuit");
+    const sessionId = crypto.randomUUID();
 
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setTaskAreaBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+      setTrackingBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     }
 
-    const startTracking = async () => {
+    const begin = async () => {
       const ok = await initWebGazer();
       if (!ok) return;
 
       try {
         const wg = getWebGazer();
-        wg.setGazeListener((data: any) => {
-          if (data) addGazePoint(data.x, data.y);
-        });
-        startEyeTracking(wg);
+        startTracking(wg, "pursuit", sessionId);
       } catch (e) {
-        console.warn("WebGazer gaze listener error", e);
+        console.warn("Tracking start error", e);
       }
     };
 
-    void startTracking();
+    void begin();
 
     const startTime = Date.now();
     const interval = setInterval(() => {
@@ -91,7 +80,6 @@ const PursuitTask = () => {
 
     return () => {
       clearInterval(interval);
-      try { getWebGazer().setGazeListener(() => {}); } catch {}
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
