@@ -120,7 +120,13 @@ const Results = () => {
           </div>
         )}
 
-        {/* Gaze trajectory visualization */}
+        {/* Head stability section */}
+        {headStability && (
+          <div className="card-surface p-5">
+            <HeadStabilityCard report={headStability} />
+          </div>
+        )}
+
         <div className="card-surface p-5 space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Blikkbane (X over tid)</h2>
           <GazeChart report={report} />
