@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getWebGazer, initWebGazer, stopWebGazer } from "@/lib/webgazer-loader";
 import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
+import { startEyeTracking, stopEyeTracking, analyzeEyeSync } from "@/lib/eye-tracking";
 
 const DURATION = 15000;
 
@@ -25,13 +26,16 @@ const PursuitTask = () => {
 
   const handleDone = useCallback(() => {
     setPhase("done");
+    const eyeFrames = stopEyeTracking();
     const session = endSession();
 
     stopWebGazer();
 
     if (session) {
       const report = analyzeSession(session);
+      const eyeSync = analyzeEyeSync(eyeFrames);
       sessionStorage.setItem("lastReport", JSON.stringify(report));
+      if (eyeSync) sessionStorage.setItem("lastEyeSync", JSON.stringify(eyeSync));
       navigate("/results");
     }
   }, [navigate]);
@@ -55,6 +59,7 @@ const PursuitTask = () => {
         wg.setGazeListener((data: any) => {
           if (data) addGazePoint(data.x, data.y);
         });
+        startEyeTracking(wg);
       } catch (e) {
         console.warn("WebGazer gaze listener error", e);
       }

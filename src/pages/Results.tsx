@@ -2,17 +2,20 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SessionReport, exportToJSON, exportToCSV } from "@/lib/gaze-store";
+import { EyeSyncReport } from "@/lib/eye-tracking";
+import EyeSyncCard from "@/components/EyeSyncCard";
 import { ArrowLeft, Download, Eye, Activity, BarChart3, AlertTriangle } from "lucide-react";
 
 const Results = () => {
   const navigate = useNavigate();
   const [report, setReport] = useState<SessionReport | null>(null);
+  const [eyeSync, setEyeSync] = useState<EyeSyncReport | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("lastReport");
-    if (stored) {
-      setReport(JSON.parse(stored));
-    }
+    if (stored) setReport(JSON.parse(stored));
+    const storedEye = sessionStorage.getItem("lastEyeSync");
+    if (storedEye) setEyeSync(JSON.parse(storedEye));
   }, []);
 
   const handleExportJSON = () => {
@@ -105,6 +108,13 @@ const Results = () => {
             <DetailRow label="Oppgavetype" value={taskLabel} />
           </div>
         </div>
+
+        {/* Eye sync section */}
+        {eyeSync && (
+          <div className="card-surface p-5">
+            <EyeSyncCard report={eyeSync} />
+          </div>
+        )}
 
         {/* Gaze trajectory visualization */}
         <div className="card-surface p-5 space-y-3">

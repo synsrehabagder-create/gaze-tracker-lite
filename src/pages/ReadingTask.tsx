@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getWebGazer, initWebGazer, stopWebGazer } from "@/lib/webgazer-loader";
 import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
+import { startEyeTracking, stopEyeTracking, analyzeEyeSync } from "@/lib/eye-tracking";
 
 const READING_TEXT = `Solen skinte over de grønne åsene da Emma og hunden hennes, Buster, gikk ut på tur. De fulgte stien langs elven, der vannet rant stille mellom steinene. Buster stoppet for å snuse på en blomst. Emma lo og klappet ham på hodet.
 
@@ -45,6 +46,7 @@ const ReadingTask = () => {
         wg.setGazeListener((data: any) => {
           if (data) addGazePoint(data.x, data.y);
         });
+        startEyeTracking(wg);
       } catch (e) {
         console.warn("WebGazer gaze listener error", e);
       }
@@ -60,13 +62,16 @@ const ReadingTask = () => {
 
   const handleDone = useCallback(() => {
     setPhase("done");
+    const eyeFrames = stopEyeTracking();
     const session = endSession();
 
     stopWebGazer();
 
     if (session) {
       const report = analyzeSession(session);
+      const eyeSync = analyzeEyeSync(eyeFrames);
       sessionStorage.setItem("lastReport", JSON.stringify(report));
+      if (eyeSync) sessionStorage.setItem("lastEyeSync", JSON.stringify(eyeSync));
       navigate("/results");
     }
   }, [navigate]);
