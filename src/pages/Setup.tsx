@@ -92,7 +92,7 @@ const Setup = () => {
             <div className="card-surface p-8 flex flex-col items-center gap-4 text-center">
               <Camera className="w-12 h-12 text-primary" />
               <p className="text-sm text-muted-foreground">
-                Vi trenger tilgang til kameraet for å spore øyebevegelser. Ingen video lagres.
+                Vi trenger tilgang til kameraet for å spore øyebevegelser med MediaPipe FaceMesh (478 punkter). Ingen video lagres.
               </p>
               <Button onClick={requestCamera} className="w-full">
                 Gi kameratilgang
