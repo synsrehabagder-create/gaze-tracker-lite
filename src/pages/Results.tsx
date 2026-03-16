@@ -11,12 +11,15 @@ const Results = () => {
   const navigate = useNavigate();
   const [report, setReport] = useState<SessionReport | null>(null);
   const [eyeSync, setEyeSync] = useState<EyeSyncReport | null>(null);
+  const [headStability, setHeadStability] = useState<HeadStabilityReport | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("lastReport");
     if (stored) setReport(JSON.parse(stored));
     const storedEye = sessionStorage.getItem("lastEyeSync");
     if (storedEye) setEyeSync(JSON.parse(storedEye));
+    const storedHead = sessionStorage.getItem("lastHeadStability");
+    if (storedHead) setHeadStability(JSON.parse(storedHead));
   }, []);
 
   const handleExportJSON = () => {
