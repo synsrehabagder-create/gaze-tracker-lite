@@ -178,7 +178,12 @@ function analyzeBlinkMetrics(frames: FrameFeatures[], durationMs: number): Blink
 }
 
 function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
-  const FIXATION_THRESHOLD = 15; // px movement = still a fixation
+  // Compute median PD for scale-relative thresholds
+  const pds = frames.map(f => f.pd).sort((a, b) => a - b);
+  const medianPD = pds[Math.floor(pds.length / 2)] || 50;
+
+  // Thresholds as fraction of PD (eye movements in landmark space are small)
+  const FIXATION_THRESHOLD = medianPD * 0.08; // ~4px at PD=50
   const MIN_FIXATION_MS = 50;
 
   const fixations: { start: number; end: number; jitter: number }[] = [];
@@ -198,7 +203,6 @@ function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
       jitterSum += movement;
       jitterCount++;
     } else {
-      // End fixation
       const dur = frames[i].timestamp - frames[fixStart].timestamp;
       if (dur >= MIN_FIXATION_MS) {
         fixations.push({
@@ -221,7 +225,9 @@ function analyzeFixations(frames: FrameFeatures[]): FixationMetrics {
   const avg = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
 
   const avgJitter = fixations.length > 0 ? fixations.reduce((a, f) => a + f.jitter, 0) / fixations.length : 0;
-  const fixationStability = Math.max(0, Math.min(100, Math.round(100 - avgJitter * 5)));
+  // Normalize jitter penalty by PD scale
+  const normalizedJitter = medianPD > 0 ? (avgJitter / medianPD) * 100 : avgJitter;
+  const fixationStability = Math.max(0, Math.min(100, Math.round(100 - normalizedJitter * 20)));
 
   return {
     totalFixations: fixations.length,
