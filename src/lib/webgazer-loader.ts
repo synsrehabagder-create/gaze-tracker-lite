@@ -19,7 +19,6 @@ function hideWebGazerUI() {
 }
 
 export async function initWebGazer() {
-  if (initialized) return true;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
@@ -40,12 +39,25 @@ export async function initWebGazer() {
     } catch (error) {
       console.error("WebGazer init failed:", error);
       initialized = false;
-      initPromise = null;
       return false;
+    } finally {
+      initPromise = null;
     }
   })();
 
   return initPromise;
+}
+
+export function stopWebGazer() {
+  try {
+    webgazer.setGazeListener(() => {});
+    webgazer.end();
+  } catch {
+    // no-op
+  } finally {
+    initialized = false;
+    initPromise = null;
+  }
 }
 
 export function isWebGazerReady() {

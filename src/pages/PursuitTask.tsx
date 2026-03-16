@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { getWebGazer } from "@/lib/webgazer-loader";
+import { getWebGazer, initWebGazer, stopWebGazer } from "@/lib/webgazer-loader";
 import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
 
 const DURATION = 15000;
@@ -27,11 +27,7 @@ const PursuitTask = () => {
     setPhase("done");
     const session = endSession();
 
-    try {
-      const wg = getWebGazer();
-      wg.setGazeListener(() => {});
-      wg.end();
-    } catch {}
+    stopWebGazer();
 
     if (session) {
       const report = analyzeSession(session);
@@ -50,14 +46,21 @@ const PursuitTask = () => {
       setTaskAreaBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     }
 
-    try {
-      const wg = getWebGazer();
-      wg.setGazeListener((data: any) => {
-        if (data) addGazePoint(data.x, data.y);
-      });
-    } catch (e) {
-      console.warn("WebGazer gaze listener error", e);
-    }
+    const startTracking = async () => {
+      const ok = await initWebGazer();
+      if (!ok) return;
+
+      try {
+        const wg = getWebGazer();
+        wg.setGazeListener((data: any) => {
+          if (data) addGazePoint(data.x, data.y);
+        });
+      } catch (e) {
+        console.warn("WebGazer gaze listener error", e);
+      }
+    };
+
+    void startTracking();
 
     const startTime = Date.now();
     const interval = setInterval(() => {
