@@ -46,6 +46,7 @@ const ReadingTask = () => {
         wg.setGazeListener((data: any) => {
           if (data) addGazePoint(data.x, data.y);
         });
+        startEyeTracking(wg);
       } catch (e) {
         console.warn("WebGazer gaze listener error", e);
       }
