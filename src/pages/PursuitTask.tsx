@@ -30,8 +30,8 @@ const PursuitTask = () => {
 
     if (report) {
       sessionStorage.setItem("clinicalReport", JSON.stringify(report));
-      navigate("/results");
     }
+    navigate("/results");
   }, [navigate]);
 
   useEffect(() => {
