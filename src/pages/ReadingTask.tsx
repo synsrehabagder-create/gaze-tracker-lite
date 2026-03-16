@@ -28,6 +28,7 @@ const ReadingTask = () => {
   useEffect(() => {
     if (phase !== "reading") return;
 
+    let cancelled = false;
     startSession("reading");
 
     if (taskAreaRef.current) {
@@ -35,16 +36,24 @@ const ReadingTask = () => {
       setTaskAreaBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     }
 
-    try {
-      const wg = getWebGazer();
-      wg.setGazeListener((data: any) => {
-        if (data) addGazePoint(data.x, data.y);
-      });
-    } catch (e) {
-      console.warn("WebGazer gaze listener error", e);
-    }
+    const startTracking = async () => {
+      const ok = await initWebGazer();
+      if (!ok || cancelled) return;
+
+      try {
+        const wg = getWebGazer();
+        wg.setGazeListener((data: any) => {
+          if (data) addGazePoint(data.x, data.y);
+        });
+      } catch (e) {
+        console.warn("WebGazer gaze listener error", e);
+      }
+    };
+
+    void startTracking();
 
     return () => {
+      cancelled = true;
       try { getWebGazer().setGazeListener(() => {}); } catch {}
     };
   }, [phase]);
