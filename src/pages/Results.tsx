@@ -9,12 +9,13 @@ import { ArrowLeft, Download, Eye, Activity, BarChart3, AlertTriangle } from "lu
 const Results = () => {
   const navigate = useNavigate();
   const [report, setReport] = useState<SessionReport | null>(null);
+  const [eyeSync, setEyeSync] = useState<EyeSyncReport | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem("lastReport");
-    if (stored) {
-      setReport(JSON.parse(stored));
-    }
+    if (stored) setReport(JSON.parse(stored));
+    const storedEye = sessionStorage.getItem("lastEyeSync");
+    if (storedEye) setEyeSync(JSON.parse(storedEye));
   }, []);
 
   const handleExportJSON = () => {
