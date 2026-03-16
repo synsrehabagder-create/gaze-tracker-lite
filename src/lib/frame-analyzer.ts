@@ -240,9 +240,9 @@ export function extractFrameFeatures(positions: number[][], timestamp: number): 
   const leftIris = hasIris ? getLandmark(positions, LEFT_IRIS[0]) : null;
   const rightIris = hasIris ? getLandmark(positions, RIGHT_IRIS[0]) : null;
 
-  // EAR
-  const leftEAR = computeEAR(positions, LEFT_EYE_UPPER, LEFT_EYE_LOWER, LEFT_EYE_CORNER_OUTER, LEFT_EYE_CORNER_INNER);
-  const rightEAR = computeEAR(positions, RIGHT_EYE_UPPER, RIGHT_EYE_LOWER, RIGHT_EYE_CORNER_OUTER, RIGHT_EYE_CORNER_INNER);
+  // EAR (classic 6-point formula)
+  const leftEAR = computeEAR(positions, LEFT_EYE_CORNER_OUTER, LEFT_EAR_P2, LEFT_EAR_P3, LEFT_EYE_CORNER_INNER, LEFT_EAR_P5, LEFT_EAR_P6);
+  const rightEAR = computeEAR(positions, RIGHT_EYE_CORNER_OUTER, RIGHT_EAR_P2, RIGHT_EAR_P3, RIGHT_EYE_CORNER_INNER, RIGHT_EAR_P5, RIGHT_EAR_P6);
 
   // Blink detection
   const leftBlink = leftEAR < BLINK_EAR_THRESHOLD;
