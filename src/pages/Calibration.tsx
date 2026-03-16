@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { initWebGazer, isWebGazerReady, getWebGazer } from "@/lib/webgazer-loader";
+import { getWebGazer, getWebGazerInitError, initWebGazer, isWebGazerReady } from "@/lib/webgazer-loader";
 
 const CALIBRATION_POINTS = [
   { x: 0.1, y: 0.1 },
@@ -14,6 +14,25 @@ const CALIBRATION_POINTS = [
   { x: 0.5, y: 0.9 },
   { x: 0.9, y: 0.9 },
 ];
+
+function toUserError(rawError: string | null) {
+  if (!rawError) return "Kunne ikke starte blikksporing på denne enheten/nettleseren.";
+
+  const e = rawError.toLowerCase();
+  if (e.includes("notallowed") || e.includes("permission") || e.includes("denied")) {
+    return "Kameratilgang ble avvist. Tillat kamera i nettleseren og prøv igjen.";
+  }
+
+  if (e.includes("notfound") || e.includes("no camera") || e.includes("could not start video source")) {
+    return "Fant ikke tilgjengelig kamera på denne enheten.";
+  }
+
+  if (e.includes("network") || e.includes("404") || e.includes("failed to fetch") || e.includes("abort")) {
+    return "Kunne ikke laste sporingsmotoren. Prøv å laste siden på nytt.";
+  }
+
+  return "Kunne ikke starte blikksporing på denne enheten/nettleseren.";
+}
 
 const Calibration = () => {
   const navigate = useNavigate();
@@ -32,7 +51,7 @@ const Calibration = () => {
 
     if (!ok) {
       setStatus("error");
-      setError("Kunne ikke starte blikksporing på denne enheten/nettleseren.");
+      setError(toUserError(getWebGazerInitError()));
       return;
     }
 
