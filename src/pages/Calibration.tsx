@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { loadWebGazer } from "@/lib/webgazer-loader";
+import { getWebGazer } from "@/lib/webgazer-loader";
 
-// 9-point calibration grid positions (normalized 0-1)
 const CALIBRATION_POINTS = [
   { x: 0.1, y: 0.1 },
   { x: 0.5, y: 0.1 },
@@ -21,6 +20,7 @@ const Calibration = () => {
   const [clickCount, setClickCount] = useState(0);
   const [status, setStatus] = useState<"loading" | "calibrating" | "done">("loading");
   const [hitPoints, setHitPoints] = useState<Set<number>>(new Set());
+  const [error, setError] = useState<string | null>(null);
   const CLICKS_PER_POINT = 3;
 
   useEffect(() => {
@@ -28,34 +28,30 @@ const Calibration = () => {
 
     const init = async () => {
       try {
-        const webgazer = await loadWebGazer();
-        webgazer
-          .setRegression("ridge")
-          .setGazeListener(() => {})
+        const wg = getWebGazer();
+        
+        wg.setRegression("ridge")
+          .setGazeListener((_data: any, _clock: any) => {})
           .showPredictionPoints(false);
 
-        // Hide WebGazer's default video
-        await webgazer.begin();
+        await wg.begin();
 
-        const videoEl = document.getElementById("webgazerVideoFeed") as HTMLVideoElement;
-        if (videoEl) videoEl.style.display = "none";
-        const videoContainer = document.getElementById("webgazerVideoContainer");
-        if (videoContainer) videoContainer.style.display = "none";
-        const faceOverlay = document.getElementById("webgazerFaceOverlay");
-        if (faceOverlay) faceOverlay.style.display = "none";
-        const faceFeedbackBox = document.getElementById("webgazerFaceFeedbackBox");
-        if (faceFeedbackBox) faceFeedbackBox.style.display = "none";
+        // Hide WebGazer's default video elements
+        const ids = ["webgazerVideoFeed", "webgazerVideoContainer", "webgazerFaceOverlay", "webgazerFaceFeedbackBox"];
+        ids.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = "none";
+        });
 
         if (mounted) setStatus("calibrating");
       } catch (err) {
         console.error("WebGazer init failed:", err);
+        if (mounted) setError("Kunne ikke starte blikksporing. Sjekk at kameraet er tilgjengelig.");
       }
     };
 
     init();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const handlePointClick = useCallback(
@@ -65,11 +61,15 @@ const Calibration = () => {
       const newCount = clickCount + 1;
       setClickCount(newCount);
 
-      // Feed click to WebGazer for calibration
       const point = CALIBRATION_POINTS[index];
       const x = point.x * window.innerWidth;
       const y = point.y * window.innerHeight;
-      (window as any).webgazer?.recordScreenPosition(x, y, "click");
+      
+      try {
+        getWebGazer().recordScreenPosition(x, y, "click");
+      } catch (e) {
+        console.warn("recordScreenPosition failed", e);
+      }
 
       if (newCount >= CLICKS_PER_POINT) {
         const newHit = new Set(hitPoints);
@@ -95,6 +95,7 @@ const Calibration = () => {
           <div className="text-center space-y-3">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-sm text-muted-foreground">Laster blikksporing…</p>
+            {error && <p className="text-sm text-destructive max-w-xs">{error}</p>}
           </div>
         </div>
       )}

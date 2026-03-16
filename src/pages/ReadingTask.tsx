@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { getWebGazer } from "@/lib/webgazer-loader";
 import { startSession, addGazePoint, endSession, setTaskAreaBounds, analyzeSession } from "@/lib/gaze-store";
 
 const READING_TEXT = `Solen skinte over de grønne åsene da Emma og hunden hennes, Buster, gikk ut på tur. De fulgte stien langs elven, der vannet rant stille mellom steinene. Buster stoppet for å snuse på en blomst. Emma lo og klappet ham på hodet.
@@ -11,11 +12,9 @@ Etter en lang tur satte de seg under et stort eiketre. Emma tok frem matpakken s
 const ReadingTask = () => {
   const navigate = useNavigate();
   const taskAreaRef = useRef<HTMLDivElement>(null);
-  const [isRunning, setIsRunning] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [phase, setPhase] = useState<"countdown" | "reading" | "done">("countdown");
 
-  // Countdown
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdown <= 0) {
@@ -26,51 +25,42 @@ const ReadingTask = () => {
     return () => clearTimeout(timer);
   }, [countdown, phase]);
 
-  // Start gaze tracking when reading begins
   useEffect(() => {
     if (phase !== "reading") return;
 
     startSession("reading");
-    setIsRunning(true);
 
-    // Set task area bounds
     if (taskAreaRef.current) {
       const rect = taskAreaRef.current.getBoundingClientRect();
       setTaskAreaBounds({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
     }
 
-    // Listen to WebGazer
-    const webgazer = (window as any).webgazer;
-    if (webgazer) {
-      webgazer.setGazeListener((data: any) => {
-        if (data) {
-          addGazePoint(data.x, data.y);
-        }
+    try {
+      const wg = getWebGazer();
+      wg.setGazeListener((data: any) => {
+        if (data) addGazePoint(data.x, data.y);
       });
+    } catch (e) {
+      console.warn("WebGazer gaze listener error", e);
     }
 
     return () => {
-      if (webgazer) {
-        webgazer.setGazeListener(() => {});
-      }
+      try { getWebGazer().setGazeListener(() => {}); } catch {}
     };
   }, [phase]);
 
   const handleDone = useCallback(() => {
-    setIsRunning(false);
     setPhase("done");
     const session = endSession();
 
-    // Stop WebGazer
-    const webgazer = (window as any).webgazer;
-    if (webgazer) {
-      webgazer.setGazeListener(() => {});
-      webgazer.end();
-    }
+    try {
+      const wg = getWebGazer();
+      wg.setGazeListener(() => {});
+      wg.end();
+    } catch {}
 
     if (session) {
       const report = analyzeSession(session);
-      // Store in sessionStorage for results page
       sessionStorage.setItem("lastReport", JSON.stringify(report));
       navigate("/results");
     }
@@ -78,20 +68,15 @@ const ReadingTask = () => {
 
   return (
     <div className="fixed inset-0 bg-background flex flex-col">
-      {/* Minimal header */}
       <div className="px-6 py-4 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">Leseoppgave</span>
         {phase === "reading" && (
-          <button
-            onClick={handleDone}
-            className="text-sm text-primary font-medium hover:underline"
-          >
+          <button onClick={handleDone} className="text-sm text-primary font-medium hover:underline">
             Ferdig
           </button>
         )}
       </div>
 
-      {/* Task area — fixed aspect ratio */}
       <div className="flex-1 flex items-center justify-center px-6 pb-8">
         {phase === "countdown" && (
           <div className="text-center">
@@ -107,9 +92,7 @@ const ReadingTask = () => {
               className="card-surface p-8 sm:p-12"
               style={{ aspectRatio: "4/3", display: "flex", alignItems: "center" }}
             >
-              <div className="text-reading text-foreground whitespace-pre-line">
-                {READING_TEXT}
-              </div>
+              <div className="text-reading text-foreground whitespace-pre-line">{READING_TEXT}</div>
             </div>
             <p className="text-xs text-muted-foreground text-center mt-4">
               Side 1 av 1 — Trykk «Ferdig» når teksten er lest
