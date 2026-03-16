@@ -9,6 +9,13 @@ const LEFT_EYE_LOWER = [145, 153, 154, 155, 133, 144, 163];
 const LEFT_EYE_CORNER_OUTER = 33;
 const LEFT_EYE_CORNER_INNER = 133;
 
+// Classic 6-point EAR pairs (Soukupová & Čech) for reliable blink detection
+// p1=outer, p2=upper1, p3=upper2, p4=inner, p5=lower2, p6=lower1
+const LEFT_EAR_P2 = 159;  // upper lid center-outer
+const LEFT_EAR_P3 = 158;  // upper lid center-inner
+const LEFT_EAR_P5 = 153;  // lower lid center-inner
+const LEFT_EAR_P6 = 145;  // lower lid center-outer
+
 const RIGHT_EYE_UPPER = [386, 385, 384, 398, 466, 388, 387];
 const RIGHT_EYE_LOWER = [374, 380, 381, 382, 362, 373, 390];
 const RIGHT_EYE_CORNER_OUTER = 263;
