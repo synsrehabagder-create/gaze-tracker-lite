@@ -100,7 +100,7 @@ export async function initDetector(): Promise<boolean> {
       video.srcObject = stream;
       await video.play();
 
-      let fm: FaceMesh | null = null;
+      let fm: any = null;
       try {
         fm = await createFaceMesh(LOCAL_WASM_BASE);
       } catch (localErr) {
