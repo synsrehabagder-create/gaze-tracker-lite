@@ -62,8 +62,8 @@ async function acquireCamera(): Promise<MediaStream> {
   throw new Error(errors[errors.length - 1] ?? "Kunne ikke åpne kamera");
 }
 
-async function createFaceMesh(basePath: string): Promise<FaceMesh> {
-  const fm = new FaceMesh({
+async function createFaceMesh(basePath: string): Promise<any> {
+  const fm = new FaceMeshClass({
     locateFile: (file: string) => `${basePath}/${file}`,
   });
   fm.setOptions({
