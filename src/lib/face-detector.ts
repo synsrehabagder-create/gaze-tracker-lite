@@ -1,4 +1,5 @@
-import { FaceMesh } from "@mediapipe/face_mesh";
+import * as faceMeshModule from "@mediapipe/face_mesh";
+const FaceMeshClass = (faceMeshModule as any).FaceMesh || (faceMeshModule as any).default?.FaceMesh;
 
 export type FrameCallback = (
   landmarks: number[][],
@@ -17,7 +18,7 @@ const CAMERA_FALLBACKS: MediaStreamConstraints[] = [
   { video: true },
 ];
 
-let faceMesh: FaceMesh | null = null;
+let faceMesh: any = null;
 let video: HTMLVideoElement | null = null;
 let stream: MediaStream | null = null;
 let animFrameId: number | null = null;
@@ -61,8 +62,8 @@ async function acquireCamera(): Promise<MediaStream> {
   throw new Error(errors[errors.length - 1] ?? "Kunne ikke åpne kamera");
 }
 
-async function createFaceMesh(basePath: string): Promise<FaceMesh> {
-  const fm = new FaceMesh({
+async function createFaceMesh(basePath: string): Promise<any> {
+  const fm = new FaceMeshClass({
     locateFile: (file: string) => `${basePath}/${file}`,
   });
   fm.setOptions({
@@ -99,7 +100,7 @@ export async function initDetector(): Promise<boolean> {
       video.srcObject = stream;
       await video.play();
 
-      let fm: FaceMesh | null = null;
+      let fm: any = null;
       try {
         fm = await createFaceMesh(LOCAL_WASM_BASE);
       } catch (localErr) {
