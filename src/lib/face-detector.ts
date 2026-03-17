@@ -18,7 +18,7 @@ const CAMERA_FALLBACKS: MediaStreamConstraints[] = [
   { video: true },
 ];
 
-let faceMesh: FaceMesh | null = null;
+let faceMesh: any = null;
 let video: HTMLVideoElement | null = null;
 let stream: MediaStream | null = null;
 let animFrameId: number | null = null;
