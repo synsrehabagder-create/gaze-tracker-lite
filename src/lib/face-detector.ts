@@ -1,4 +1,5 @@
-import { FaceMesh } from "@mediapipe/face_mesh";
+import * as faceMeshModule from "@mediapipe/face_mesh";
+const FaceMeshClass = (faceMeshModule as any).FaceMesh || (faceMeshModule as any).default?.FaceMesh;
 
 export type FrameCallback = (
   landmarks: number[][],
